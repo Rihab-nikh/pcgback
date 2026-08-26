@@ -1,0 +1,44 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql://pcg:pcg@postgres:5432/pcg_maroc_ai
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-memory}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      OBJECT_STORAGE_PREFIX: ${OBJECT_STORAGE_PREFIX:-pcg}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ACCOUNTS_OFFLINE: ${ACCOUNTS_OFFLINE:-1}
+      JWT_SECRET: ${JWT_SECRET:-}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: pcg_maroc_ai
+      POSTGRES_USER: pcg
+      POSTGRES_PASSWORD: pcg
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pcg -d pcg_maroc_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pcg_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pcg_postgres_data:

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCG Maroc AI</title>
+<style>
+  :root{
+    --bg:#F6F7F9; --card:#fff; --border:#E2E8F0; --ink:#0F172A; --muted:#64748B;
+    --em:#0F766E; --em-strong:#0d5f59; --blue:#2563EB; --ok:#22C55E; --warn:#F59E0B; --bad:#EF4444;
+    --r:14px; font-size:14px;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+  button{font:inherit;cursor:pointer;border:1px solid var(--border);background:#fff;border-radius:10px;padding:8px 14px}
+  button.primary{background:var(--em);border-color:var(--em);color:#fff;font-weight:600}
+  button.primary:hover{background:var(--em-strong)}
+  button.danger{color:var(--bad);border-color:#fecaca}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  input,select{font:inherit;padding:9px 12px;border:1px solid var(--border);border-radius:10px;width:100%;background:#fff}
+  input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+  .row{display:flex;gap:10px;align-items:center}
+  .grow{flex:1}
+  .muted{color:var(--muted)}
+  .small{font-size:12px}
+  .label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+  .pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;border:1px solid}
+  .pill.needs_review{color:#92400e;background:#FFFBEB;border-color:#FDE68A}
+  .pill.approved{color:#166534;background:#F0FDF4;border-color:#BBF7D0}
+  .pill.rejected,.pill.failed,.pill.INVALID{color:#991b1b;background:#FEF2F2;border-color:#FECACA}
+  .pill.processing{color:#1e40af;background:#EFF6FF;border-color:#BFDBFE}
+  .pill.VALID{color:#166534;background:#F0FDF4;border-color:#BBF7D0}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:8px;border-bottom:1px solid var(--border)}
+  td{padding:9px 8px;border-bottom:1px solid #F1F5F9;font-size:13px}
+  tr.click:hover{background:#F8FAFC;cursor:pointer}
+  /* shell */
+  #topbar{height:54px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 18px;position:sticky;top:0;z-index:10}
+  .logo{display:flex;gap:8px;align-items:center;font-weight:700}
+  .logo span{width:26px;height:26px;border-radius:8px;background:var(--em);color:#fff;display:grid;place-items:center;font-size:13px}
+  #layout{display:flex;min-height:calc(100vh - 54px)}
+  #nav{width:190px;background:#fff;border-right:1px solid var(--border);padding:12px 8px}
+  #nav a{display:block;padding:9px 12px;border-radius:9px;color:var(--muted);text-decoration:none;margin-bottom:2px}
+  #nav a.active{background:#ECFDF5;color:var(--em);font-weight:600}
+  #main{flex:1;padding:18px;max-width:1500px}
+  /* login */
+  #login{min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#F0FDF4,#EFF6FF)}
+  #login .card{width:380px;padding:28px}
+  /* upload */
+  .drop{border:2px dashed var(--border);border-radius:var(--r);padding:26px;text-align:center;color:var(--muted);transition:.15s}
+  .drop.over{border-color:var(--em);background:#ECFDF5;color:var(--em)}
+  /* workspace */
+  .ws{display:grid;grid-template-columns:34fr 38fr 28fr;gap:14px;align-items:start}
+  @media(max-width:1100px){.ws{grid-template-columns:1fr}}
+  .field{border:1px solid #F1F5F9;border-radius:10px;padding:9px 11px}
+  .field:hover{border-color:var(--border)}
+  .beam{height:6px;border-radius:99px;background:#E2E8F0;overflow:hidden;position:relative}
+  .beam>i{position:absolute;inset:0 auto 0 0;background:var(--ok);transition:width .6s}
+  .check{display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-radius:8px}
+  .check:hover{background:#F8FAFC}
+  .dot{width:15px;height:15px;border-radius:99px;color:#fff;font-size:9px;display:grid;place-items:center;flex:none;margin-top:2px}
+  .wf{display:flex;justify-content:space-between;padding:6px 10px;border-radius:8px;font-size:13px}
+  .wf.total{background:var(--em);color:#fff;font-weight:600}
+  .wf.sub{background:#F8FAFC;font-weight:600}
+  .toast{position:fixed;bottom:18px;right:18px;background:var(--ink);color:#fff;padding:11px 16px;border-radius:12px;z-index:50;max-width:340px}
+  .stat{flex:1}
+  .stat b{font-size:22px}
+  .skeleton{background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);background-size:200% 100%;animation:sh 1.2s infinite;border-radius:8px;height:14px}
+  @keyframes sh{to{background-position:-200% 0}}
+  img.orig{width:100%;border-radius:10px;border:1px solid var(--border);background:#fff}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+"use strict";
+const $ = (sel, el=document) => el.querySelector(sel);
+const API = "";               // same origin
+let token = null; // Auth is HttpOnly cookie-based; JS never stores credentials.
+let me = null;
+let route = { page: "dashboard", id: null };
+
+// ── API helper ──
+async function api(path, opts = {}) {
+  const headers = opts.headers || {};
+  if (opts.json) { headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(opts.json); }
+  const res = await fetch(API + path, { ...opts, headers });
+  if (res.status === 401) { logout(); throw new Error("Session expirée — reconnectez-vous."); }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail || detail; } catch {}
+    throw new Error(detail);
+  }
+  return res.headers.get("content-type")?.includes("json") ? res.json() : res;
+}
+function toast(msg, ms=3500){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
+const MAD = v => (v==null ? "—" : Number(v).toLocaleString("fr-MA",{minimumFractionDigits:2,maximumFractionDigits:2}));
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function logout(){ try{await fetch("/auth/logout",{method:"POST",credentials:"include"});}catch(e){} token=null; me=null; render(); }
+
+// ── Login ──
+function renderLogin(err="") {
+  $("#root").innerHTML = `
+  <div id="login"><form class="card" id="loginForm">
+    <div class="logo" style="margin-bottom:18px"><span>P</span> PCG Maroc AI</div>
+    <div class="label" style="margin-bottom:6px">Email</div>
+    <input name="email" type="email" required value="" autocomplete="username">
+    <div class="label" style="margin:12px 0 6px">Mot de passe</div>
+    <input name="password" type="password" required autocomplete="current-password">
+    ${err?`<div class="small" style="color:var(--bad);margin-top:10px">${esc(err)}</div>`:""}
+    <button class="primary" style="width:100%;margin-top:18px">Se connecter</button>
+    <button type="button" id="showReg" style="width:100%;margin-top:8px">Créer un cabinet</button>
+  </form></div>`;
+  $("#loginForm").onsubmit = async e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    try {
+      const r = await api("/auth/login", { method:"POST", json:{ email:f.get("email"), password:f.get("password") }});
+      me = r.user; render();
+    } catch (ex) { renderLogin(ex.message); }
+  };
+  $("#showReg").onclick = () => renderRegister();
+}
+function renderRegister(err="") {
+  $("#root").innerHTML = `
+  <div id="login"><form class="card" id="regForm">
+    <div class="logo" style="margin-bottom:18px"><span>P</span> Nouveau cabinet</div>
+    <div class="label" style="margin-bottom:6px">Nom du cabinet</div><input name="firm_name" required>
+    <div class="label" style="margin:12px 0 6px">Votre nom</div><input name="full_name" required>
+    <div class="label" style="margin:12px 0 6px">Email</div><input name="email" type="email" required>
+    <div class="label" style="margin:12px 0 6px">Mot de passe (8+ caractères)</div><input name="password" type="password" minlength="8" required>
+    ${err?`<div class="small" style="color:var(--bad);margin-top:10px">${esc(err)}</div>`:""}
+    <button class="primary" style="width:100%;margin-top:18px">Créer le cabinet</button>
+    <button type="button" id="back" style="width:100%;margin-top:8px">Retour</button>
+  </form></div>`;
+  $("#regForm").onsubmit = async e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    try {
+      const r = await api("/auth/register-firm", { method:"POST", json:f });
+      me = r.user; render();
+    } catch (ex) { renderRegister(ex.message); }
+  };
+  $("#back").onclick = () => renderLogin();
+}
+
+// ── Shell ──
+const NAV = [["dashboard","Tableau de bord"],["clients","Clients"],["invoices","Factures"],["journal","Écritures"],["team","Équipe"]];
+function shell(content) {
+  $("#root").innerHTML = `
+  <div id="topbar">
+    <div class="logo"><span>P</span> PCG Maroc AI</div>
+    <div class="grow"></div>
+    <span class="small muted" id="notifBadge"></span>
+    <span class="small">${esc(me.full_name)} · <span class="muted">${esc(me.role)}</span></span>
+    <button id="logoutBtn">Déconnexion</button>
+  </div>
+  <div id="layout">
+    <nav id="nav">${NAV.filter(([k])=>k!=="team"||me.role==="firm_admin")
+      .map(([k,l])=>`<a href="#" data-p="${k}" class="${route.page===k?"active":""}">${l}</a>`).join("")}</nav>
+    <div id="main">${content}</div>
+  </div>`;
+  $("#logoutBtn").onclick = logout;
+  document.querySelectorAll("#nav a").forEach(a => a.onclick = e => { e.preventDefault(); go(a.dataset.p); });
+  api("/notifications?unread_only=true").then(n => { if(n.length) $("#notifBadge").textContent = `🔔 ${n.length}`; }).catch(()=>{});
+}
+function go(page, id=null){ route={page,id}; render(); }
+
+// ── Dashboard ──
+async function pageDashboard() {
+  shell(`<div class="skeleton" style="height:120px"></div>`);
+  const d = await api("/dashboard");
+  const s = d.stats;
+  shell(`
+    <h2 style="margin-bottom:14px">Bonjour, ${esc(me.full_name.split(" ")[0])}</h2>
+    <div class="row" style="margin-bottom:14px">
+      ${[["Aujourd'hui",s.today],["À valider",s.needs_review],["Approuvées",s.approved],
+         ["Doublons",s.duplicates],["Confiance moy.",s.avg_confidence?Math.round(s.avg_confidence*100)+" %":"—"]]
+        .map(([l,v])=>`<div class="card stat"><div class="label">${l}</div><b class="mono">${v}</b></div>`).join("")}
+    </div>
+    <div class="row" style="align-items:start">
+      <div class="card grow"><div class="label" style="margin-bottom:8px">Factures récentes</div>
+        ${invoiceTable(d.recent_invoices)}</div>
+      <div class="card" style="width:300px"><div class="label" style="margin-bottom:8px">Clients avec du travail en attente</div>
+        ${d.clients_with_pending.length ? d.clients_with_pending.map(c=>
+          `<div class="row" style="padding:6px 0"><span class="grow">${esc(c.name)}</span><span class="pill needs_review">${c.pending_count}</span></div>`).join("")
+          : `<div class="muted small">Rien en attente. 🎉</div>`}</div>
+    </div>`);
+  bindInvoiceRows();
+}
+
+// ── Clients ──
+async function pageClients() {
+  shell(`<div class="skeleton" style="height:120px"></div>`);
+  const clients = await api("/clients");
+  const canCreate = me.role === "firm_admin";
+  shell(`
+    <div class="row" style="margin-bottom:14px"><h2 class="grow">Clients</h2>
+      ${canCreate?`<button class="primary" id="newClient">+ Nouveau client</button>`:""}</div>
+    <div class="card">
+      <table><thead><tr><th>Nom</th><th>ICE</th><th>Comptable</th><th>Factures</th><th>En attente</th></tr></thead>
+      <tbody>${clients.map(c=>`<tr class="click" data-id="${c.id}"><td><b>${esc(c.name)}</b></td>
+        <td class="mono">${esc(c.ice)||"—"}</td><td>${esc(c.accountant_name)||"—"}</td>
+        <td class="mono">${c.invoice_count}</td>
+        <td>${c.pending_count?`<span class="pill needs_review">${c.pending_count}</span>`:"—"}</td></tr>`).join("")
+        || `<tr><td colspan="5" class="muted">Aucun client. ${canCreate?"Créez le premier pour commencer à traiter des factures.":""}</td></tr>`}</tbody></table>
+    </div>`);
+  document.querySelectorAll("tr.click").forEach(tr => tr.onclick = () => go("invoices", tr.dataset.id));
+  if (canCreate) $("#newClient").onclick = async () => {
+    const name = prompt("Nom du client :"); if (!name) return;
+    const ice = prompt("ICE (optionnel) :") || null;
+    try { await api("/clients", { method:"POST", json:{ name, ice } }); toast("Client créé : " + name); pageClients(); }
+    catch (ex) { toast("Erreur : " + ex.message); }
+  };
+}
+
+// ── Invoices list + upload ──
+function invoiceTable(items) {
+  return `<table><thead><tr><th>N°</th><th>Fournisseur</th><th>Client</th><th>TTC</th><th>Verdict</th><th>Statut</th><th>Confiance</th></tr></thead>
+  <tbody>${items.map(i=>`<tr class="click inv" data-id="${i.id}">
+    <td class="mono">${esc(i.invoice_number)||esc(i.filename)}</td><td>${esc(i.supplier_name)||"—"}</td>
+    <td>${esc(i.client_name)}</td><td class="mono">${MAD(i.ttc)}</td>
+    <td>${i.verdict?`<span class="pill ${i.verdict}">${i.verdict}</span>`:"—"}
+        ${i.is_duplicate_of?` <span class="pill rejected">doublon</span>`:""}</td>
+    <td><span class="pill ${i.status}">${i.status}</span></td>
+    <td class="mono">${i.confidence!=null?Math.round(i.confidence*100)+" %":"—"}</td></tr>`).join("")
+    || `<tr><td colspan="7" class="muted">Aucune facture pour l'instant — déposez-en une ci-dessus.</td></tr>`}</tbody></table>`;
+}
+function bindInvoiceRows(){ document.querySelectorAll("tr.inv").forEach(tr => tr.onclick = () => go("workspace", tr.dataset.id)); }
+
+async function pageInvoices() {
+  shell(`<div class="skeleton" style="height:120px"></div>`);
+  const [clients, list] = await Promise.all([api("/clients"), api("/invoices?limit=100" + (route.id?`&client_id=${route.id}`:""))]);
+  shell(`
+    <div class="row" style="margin-bottom:14px"><h2 class="grow">Factures</h2>
+      <select id="clientSel" style="width:260px">
+        <option value="">— Choisir le client pour l'upload —</option>
+        ${clients.map(c=>`<option value="${c.id}" ${c.id===route.id?"selected":""}>${esc(c.name)}</option>`).join("")}
+      </select></div>
+    <div class="drop" id="drop">Déposez une facture (image) ici, ou cliquez pour choisir un fichier.
+      <input type="file" id="file" accept="image/*" hidden></div>
+    <div id="progress" style="margin:10px 0"></div>
+    <div class="card" style="margin-top:14px">${invoiceTable(list.items)}</div>`);
+  bindInvoiceRows();
+  const drop = $("#drop"), file = $("#file");
+  drop.onclick = () => file.click();
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); };
+  file.onchange = () => file.files[0] && upload(file.files[0]);
+
+  async function upload(f) {
+    const clientId = $("#clientSel").value;
+    if (!clientId) return toast("Choisissez d'abord un client.");
+    $("#progress").innerHTML = `<div class="card row"><div class="skeleton" style="width:18px;height:18px;border-radius:99px"></div>
+      <span>L'IA lit « ${esc(f.name)} » — extraction, calculs, écriture, 14 contrôles…</span></div>`;
+    const body = new FormData(); body.append("file", f);
+    try {
+      const inv = await api(`/invoices/upload?client_id=${clientId}`, { method:"POST", body });
+      toast(inv.is_duplicate_of ? "⚠️ Doublon possible détecté" : `Facture traitée — ${inv.verdict}`);
+      go("workspace", inv.id);
+    } catch (ex) { $("#progress").innerHTML=""; toast("Échec du traitement : " + ex.message, 6000); }
+  }
+}
+
+// ── Workspace (hero) ──
+async function pageWorkspace() {
+  shell(`<div class="skeleton" style="height:200px"></div>`);
+  const inv = await api("/invoices/" + route.id);
+  const r = inv.response || {};
+  const ext = r.step1_identification || {}, calc = r.step2_calculations || {};
+  const entries = r.step4_journal_entries || [], checks = r.validation_checks || [], balances = r.balance_checks || [];
+  const passed = checks.filter(c=>c.passed).length;
+  const debit = entries.flatMap(e=>e.lines).filter(l=>l.side==="DEBIT").reduce((s,l)=>s+l.amount,0);
+  const credit = entries.flatMap(e=>e.lines).filter(l=>l.side==="CREDIT").reduce((s,l)=>s+l.amount,0);
+  const balanced = Math.abs(debit-credit) < 0.01;
+  const wf = [
+    ["Montant brut", calc.montant_brut, "sub"],
+    calc.rabais_amount ? [`Rabais ${calc.rabais_pct} %`, -calc.rabais_amount] : null,
+    calc.remise_amount ? [`Remise ${calc.remise_pct} %`, -calc.remise_amount] : null,
+    calc.ristourne_amount ? [`Ristourne ${calc.ristourne_pct} %`, -calc.ristourne_amount] : null,
+    ["Net commercial", calc.net_commercial, "sub"],
+    calc.escompte_amount ? [`Escompte ${calc.escompte_pct} %`, -calc.escompte_amount] : null,
+    ["Net financier HT", calc.net_financier_ht, "sub"],
+    calc.tva_amount ? [`TVA ${calc.tva_pct} %`, calc.tva_amount] : null,
+    calc.retenue_a_la_source_amount ? [`RAS ${calc.retenue_a_la_source_pct} %`, -calc.retenue_a_la_source_amount] : null,
+    calc.droits_de_timbre ? ["Droits de timbre", calc.droits_de_timbre] : null,
+    ["Net à payer", calc.net_a_payer, "total"],
+  ].filter(Boolean);
+  const fields = [
+    ["Fournisseur", ext.supplier_name], ["N° facture", ext.invoice_number], ["Date", ext.date],
+    ["Type", ext.invoice_type + " · " + ext.invoice_category], ["Paiement", ext.payment_mode],
+    ["Immobilisation", ext.is_immobilisation ? "Oui — " + (ext.immobilisation_type||"") : "Non"],
+  ];
+  shell(`
+    <div class="row" style="margin-bottom:12px">
+      <button onclick="history.back()">←</button>
+      <h2 class="grow">${esc(inv.invoice_number)||esc(inv.filename)} <span class="pill ${inv.status}">${inv.status}</span>
+        ${inv.is_duplicate_of?`<span class="pill rejected">doublon possible</span>`:""}</h2>
+      <span class="small muted">${inv.model||""} · ${inv.duration_ms?inv.duration_ms+" ms":""}</span>
+    </div>
+    <div class="ws">
+      <section>
+        <div class="label" style="margin-bottom:8px">Document original</div>
+        <img class="orig" src="/invoices/${inv.id}/file" alt="Facture originale"
+             onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'card muted',textContent:'Original non disponible'}))">
+      </section>
+      <section>
+        <div class="label" style="margin-bottom:8px">Extraction IA</div>
+        <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${fields.map(([l,v])=>`<div class="field"><div class="small muted">${l}</div><b>${esc(v)||"—"}</b></div>`).join("")}
+        </div>
+        ${ext.assumptions?.length?`<div class="card" style="margin-top:10px;border-color:#BFDBFE">
+          <div class="label" style="margin-bottom:6px;color:var(--blue)">Raisonnement de l'IA</div>
+          ${ext.assumptions.map(a=>`<div class="small" style="padding:3px 0">→ ${esc(a)}</div>`).join("")}</div>`:""}
+        <div class="card" style="margin-top:10px">
+          <div class="label" style="margin-bottom:6px">Cascade de calcul</div>
+          ${wf.map(([l,v,k])=>`<div class="wf ${k||""}"><span>${l}</span>
+            <span class="mono" style="${!k&&v<0?"color:var(--bad)":!k?"color:var(--blue)":""}">${v<0?"− ":""}${MAD(Math.abs(v))}</span></div>`).join("")}
+        </div>
+      </section>
+      <section>
+        <div class="label" style="margin-bottom:8px">Écritures — ${balanced?"équilibrées":"DÉSÉQUILIBRE"}</div>
+        <div class="card" style="border-color:${balanced?"#BBF7D0":"#FECACA"}">
+          <div class="row small" style="justify-content:space-between;margin-bottom:6px">
+            <span>Débit <b class="mono">${MAD(debit)}</b></span>
+            <span class="pill ${balanced?"approved":"rejected"}">${balanced?"ÉQUILIBRÉE":"À CORRIGER"}</span>
+            <span>Crédit <b class="mono">${MAD(credit)}</b></span></div>
+          <div class="beam"><i style="width:${debit+credit?debit/(debit+credit)*100:50}%"></i></div>
+        </div>
+        ${entries.map(e=>`<div class="card" style="margin-top:10px;padding:0;overflow:hidden">
+          <div class="small muted" style="padding:9px 12px;border-bottom:1px solid var(--border)">${esc(e.perspective)} · ${esc(e.libelle)}</div>
+          <table><tbody>${e.lines.map(l=>`<tr>
+            <td style="width:26px" class="small muted">${l.side==="DEBIT"?"D":"C"}</td>
+            <td class="mono" style="width:60px"><b>${esc(l.account_number)}</b></td>
+            <td class="small">${esc(l.account_label)}</td>
+            <td class="mono" style="text-align:right;${l.side==="CREDIT"?"color:var(--muted)":""}">${MAD(l.amount)}</td></tr>`).join("")}
+          </tbody></table></div>`).join("")}
+        <div class="card" style="margin-top:10px">
+          <div class="row" style="margin-bottom:6px"><span class="label grow">Contrôles</span>
+            <span class="pill ${passed===checks.length?"approved":"rejected"}">${passed}/${checks.length}</span></div>
+          ${checks.map(c=>`<div class="check"><span class="dot" style="background:${c.passed?"var(--ok)":"var(--bad)"}">${c.passed?"✓":"✕"}</span>
+            <span class="small">${esc(c.description)}</span></div>`).join("")}
+        </div>
+        ${inv.status==="needs_review"?`<div class="row" style="margin-top:12px">
+          <button class="primary grow" id="approve">Approuver l'écriture</button>
+          <button class="danger" id="reject">Rejeter</button>
+          <button id="rerun">↻ Relancer l'IA</button></div>`:""}
+      </section>
+    </div>`);
+  if (inv.status === "needs_review") {
+    $("#approve").onclick = () => review("approve");
+    $("#reject").onclick = () => review("reject");
+    $("#rerun").onclick = async () => {
+      toast("Relance du traitement IA…");
+      try { await api(`/invoices/${inv.id}/reprocess`, { method:"POST" }); pageWorkspace(); }
+      catch (ex) { toast("Échec : " + ex.message); }
+    };
+    async function review(action) {
+      try { await api(`/invoices/${inv.id}/review`, { method:"POST", json:{ action } });
+        toast(action==="approve" ? "✓ Écriture approuvée et comptabilisée" : "Facture rejetée");
+        pageWorkspace();
+      } catch (ex) { toast("Erreur : " + ex.message); }
+    }
+  }
+}
+
+// ── Journal ledger ──
+async function pageJournal() {
+  shell(`<div class="skeleton" style="height:120px"></div>`);
+  const j = await api("/journal");
+  shell(`
+    <div class="row" style="margin-bottom:14px"><h2 class="grow">Journal — écritures approuvées</h2>
+      <span class="pill ${j.balanced?"approved":"rejected"}">D ${MAD(j.total_debit)} / C ${MAD(j.total_credit)}</span>
+      <a href="/exports/journal.csv" id="csv"><button>Exporter CSV</button></a></div>
+    <div class="card"><table>
+      <thead><tr><th>Date</th><th>N°</th><th>Perspective</th><th>Sens</th><th>Compte</th><th>Intitulé</th><th style="text-align:right">Montant</th></tr></thead>
+      <tbody>${j.lines.map(l=>`<tr><td>${esc(l.date)||"—"}</td><td class="mono">${esc(l.invoice_number)||"—"}</td>
+        <td class="small">${esc(l.perspective)}</td><td>${l.side==="DEBIT"?"D":"C"}</td>
+        <td class="mono"><b>${esc(l.account_number)}</b></td><td class="small">${esc(l.account_label)}</td>
+        <td class="mono" style="text-align:right">${MAD(l.amount)}</td></tr>`).join("")
+        || `<tr><td colspan="7" class="muted">Aucune écriture approuvée pour l'instant.</td></tr>`}</tbody></table></div>`);
+  $("#csv").onclick = async e => {   // fetch with auth header, then download
+    e.preventDefault();
+    const res = await fetch("/exports/journal.csv", { credentials:"include" });
+    const blob = await res.blob(); const url = URL.createObjectURL(blob);
+    Object.assign(document.createElement("a"), { href:url, download:"journal.csv" }).click();
+    URL.revokeObjectURL(url);
+  };
+}
+
+// ── Team (firm admin) ──
+async function pageTeam() {
+  shell(`<div class="skeleton" style="height:120px"></div>`);
+  const team = await api("/team/accountants");
+  shell(`
+    <div class="row" style="margin-bottom:14px"><h2 class="grow">Équipe</h2>
+      <button class="primary" id="add">+ Comptable</button></div>
+    <div class="card"><table>
+      <thead><tr><th>Nom</th><th>Email</th><th>Rôle</th><th>Clients</th><th>Factures</th><th>Actif</th></tr></thead>
+      <tbody>${team.map(u=>`<tr><td><b>${esc(u.full_name)}</b></td><td>${esc(u.email)}</td><td>${esc(u.role)}</td>
+        <td class="mono">${u.client_count}</td><td class="mono">${u.invoices_processed}</td>
+        <td>${u.is_active?"✓":"—"}</td></tr>`).join("")}</tbody></table></div>`);
+  $("#add").onclick = async () => {
+    const full_name = prompt("Nom du comptable :"); if (!full_name) return;
+    const email = prompt("Email :"); if (!email) return;
+    const password = prompt("Mot de passe temporaire (8+) :"); if (!password) return;
+    try { await api("/team/accountants", { method:"POST", json:{ full_name, email, password } });
+      toast("Comptable ajouté"); pageTeam(); }
+    catch (ex) { toast("Erreur : " + ex.message); }
+  };
+}
+
+// ── Router ──
+const PAGES = { dashboard: pageDashboard, clients: pageClients, invoices: pageInvoices,
+                workspace: pageWorkspace, journal: pageJournal, team: pageTeam };
+async function render() {
+  if (!token) return renderLogin();
+  if (!me) { try { me = await api("/auth/me"); } catch { return renderLogin(); } }
+  try { await (PAGES[route.page] || pageDashboard)(); }
+  catch (ex) { shell(`<div class="card">Erreur : ${esc(ex.message)} <button onclick="render()">Réessayer</button></div>`); }
+}
+render();
+</script>
+</body>
+</html>

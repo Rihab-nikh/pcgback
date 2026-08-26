@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+httpx
+openai
+pydantic>=2
+python-dotenv
+python-multipart
+pypdf              # multi-invoice PDF auto-split (/invoices/upload-split)
+psycopg[binary]>=3.2,<4  # PostgreSQL driver
+boto3>=1.35,<2          # S3-compatible object storage / Cloudflare R2
