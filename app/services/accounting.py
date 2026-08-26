@@ -61,6 +61,21 @@ def _line_vat_total(data: ExtractedInvoiceData, net_financier_ht: Decimal, monta
     return _q(total)
 
 
+def _applicable_stamp_duty(data: ExtractedInvoiceData) -> Decimal:
+    """Resolve conditional stamp duty from explicit document evidence only."""
+    condition = (data.droits_de_timbre_condition or "").strip().casefold()
+    if not condition:
+        return _q(_d(data.droits_de_timbre))
+
+    cash_condition = any(marker in condition for marker in ("espèce", "espece", "cash"))
+    if cash_condition and data.payment_mode == "caisse":
+        amount = data.droits_de_timbre or data.droits_de_timbre_mentionne
+        return _q(_d(amount))
+
+    # An unmet or unprovable condition must never increase the payable amount.
+    return Decimal(0)
+
+
 def compute_invoice(data: ExtractedInvoiceData) -> CalculationBreakdown:
     """Apply brut -> commercial discounts -> escompte -> VAT -> withholding/timbre.
 
@@ -89,7 +104,7 @@ def compute_invoice(data: ExtractedInvoiceData) -> CalculationBreakdown:
         ras_amount = _q(withholding_base * _d(data.retenue_a_la_source_pct) / Decimal(100))
     else:
         ras_amount = Decimal(0)
-    timbre = _q(_d(data.droits_de_timbre))
+    timbre = _applicable_stamp_duty(data)
     net_a_payer = _q(ttc - ras_amount + timbre)
     return CalculationBreakdown(
         montant_brut=float(mb), rabais_pct=data.rabais_pct, rabais_amount=float(rabais_amount), net1=float(net1),

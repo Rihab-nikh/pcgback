@@ -142,9 +142,25 @@ RETENUE À LA SOURCE (RAS)
 - A withholding reduces settlement; it is not evidence that settlement actually occurred.
 
 DROITS DE TIMBRE
-- If the invoice shows "droit de timbre", "timbre fiscal", or a fixed small
-  charge (typically 20 MAD per page) → extract the MAD amount as droits_de_timbre.
-- Droits de timbre is added ON TOP of TTC (it's a charge, not a deduction).
+- Distinguish an ACTUALLY APPLICABLE stamp duty from a merely
+  CONDITIONAL/INFORMATIONAL stamp duty.
+- If the stamp duty is explicitly included in "Net à payer", "Total à payer",
+  or an equivalent payable total, extract it as droits_de_timbre.
+- If the document says that stamp duty applies only under a condition (for
+  example "uniquement en cas de règlement en espèces"), do NOT include it in
+  droits_de_timbre unless the document demonstrates that the condition is met.
+  Record the printed amount in droits_de_timbre_mentionne and the exact
+  condition in droits_de_timbre_condition.
+- Extract an explicitly printed "Net à payer", "Total à payer", or equivalent
+  into net_a_payer_document. Never calculate that observed field.
+- Never increase an explicitly printed payable total merely because a
+  conditional stamp-duty amount appears elsewhere on the invoice.
+
+Example: TTC = 199.00 MAD; the document says "Droit de timbre 0.50 DH
+uniquement en cas de règlement en espèces" and indicates bank payment:
+droits_de_timbre=0, droits_de_timbre_mentionne=0.50,
+droits_de_timbre_condition="Uniquement en cas de règlement en espèces",
+net_a_payer_document=199.00. The payable amount remains 199.00 MAD.
 
 TVA REDUCED RATES
 - Always extract the exact TVA rate printed on each line/document.

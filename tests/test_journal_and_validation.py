@@ -49,6 +49,71 @@ async def test_doit_invoice_balances_and_validates():
 
 
 @pytest.mark.asyncio
+async def test_cash_stamp_condition_with_bank_payment_is_resolved_and_not_applied():
+    calc, _, checks, _, verdict = await run(make(
+        montant_brut=165.83,
+        montant_ttc=199.00,
+        tva_pct=20,
+        droits_de_timbre_mentionne=0.50,
+        droits_de_timbre_condition="Uniquement en cas de règlement en espèces",
+        net_a_payer_document=199.00,
+        payment_mode="banque",
+    ))
+    assert calc.droits_de_timbre == 0
+    assert calc.net_a_payer == 199.00
+    assert next(c for c in checks if c.check_id == 35).passed
+    assert verdict == "VALID"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("condition", [
+    "paiement en espèces",
+    "règlement cash",
+    "paiement en espece",
+])
+async def test_cash_stamp_condition_with_cash_is_resolved_and_applied(condition):
+    calc, _, checks, _, verdict = await run(make(
+        montant_brut=165.83,
+        montant_ttc=199.00,
+        tva_pct=20,
+        droits_de_timbre_mentionne=0.50,
+        droits_de_timbre_condition=condition,
+        net_a_payer_document=199.50,
+        payment_mode="caisse",
+    ))
+    assert calc.droits_de_timbre == 0.50
+    assert calc.net_a_payer == 199.50
+    assert next(c for c in checks if c.check_id == 34).passed
+    assert next(c for c in checks if c.check_id == 35).passed
+    assert verdict == "VALID"
+
+
+@pytest.mark.asyncio
+async def test_cash_stamp_condition_without_payment_evidence_requires_review():
+    calc, _, checks, _, verdict = await run(make(
+        droits_de_timbre_mentionne=0.50,
+        droits_de_timbre_condition="Uniquement en cas de règlement en espèces",
+        payment_mode="none",
+    ))
+    stamp_check = next(c for c in checks if c.check_id == 35)
+    assert calc.droits_de_timbre == 0
+    assert not stamp_check.passed
+    assert "revue humaine" in (stamp_check.explanation or "")
+    assert verdict == "INVALID"
+
+
+@pytest.mark.asyncio
+async def test_unknown_stamp_condition_requires_review():
+    _, _, checks, _, verdict = await run(make(
+        droits_de_timbre_mentionne=50,
+        droits_de_timbre_condition="Applicable si le montant dépasse le seuil contractuel",
+        payment_mode="banque",
+    ))
+    assert not next(c for c in checks if c.check_id == 35).passed
+    assert verdict == "INVALID"
+
+
+@pytest.mark.asyncio
 async def test_immobilisation_uses_class2_and_34551():
     data = make(is_immobilisation=True, immobilisation_type="it", capitalization_policy="capitalize", tva_pct=20)
     _, entries, checks, _, verdict = await run(data)
@@ -86,8 +151,8 @@ async def test_multiline_mixed_tva_rates_split_correctly():
                         is_immobilisation=True, immobilisation_type="installation"),
         InvoiceLineItem(description="Maintenance", unit_price=500, line_total_ht=500, tva_rate=7),
     ]
-    # Note: montant_brut = sum of lines; the invoice-level tva_pct drives calc.tva_amount,
-    # and the multiline split distributes it with rounding correction on the last group.
+    # montant_brut is the sum of the lines; VAT is calculated from each line's
+    # own base and rate, then the journal groups those amounts by nature/rate.
     data = make(montant_brut=10_900, tva_pct=20, line_items=lines)
     calc, entries, _, _, _ = await run(data)
     buyer = next(e for e in entries if e.perspective == "Buyer")

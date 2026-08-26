@@ -55,6 +55,15 @@ def _external_expected_vat(data: ExtractedInvoiceData, calc: CalculationBreakdow
     return float(total.quantize(CENT, rounding=ROUND_HALF_UP))
 
 
+def _stamp_condition_is_resolved(data: ExtractedInvoiceData) -> bool:
+    """A condition is resolved only when deterministic document evidence can decide it."""
+    condition = (data.droits_de_timbre_condition or "").strip().casefold()
+    if not condition:
+        return True
+    cash_condition = any(marker in condition for marker in ("espèce", "espece", "cash"))
+    return cash_condition and data.payment_mode in {"caisse", "banque"}
+
+
 def run_validation(data: ExtractedInvoiceData, calc: CalculationBreakdown,
                    entries: list[JournalEntry]) -> tuple[list[ValidationCheck], list[BalanceCheck], str]:
     checks: list[ValidationCheck] = []
@@ -257,6 +266,19 @@ def run_validation(data: ExtractedInvoiceData, calc: CalculationBreakdown,
             "Les acquisitions classées 'other' exigent une décision capitalize/review.")
     else:
         add(33, "Politique de capitalisation — sans objet", True)
+
+    if data.net_a_payer_document is not None:
+        printed_payable = r2(data.net_a_payer_document)
+        add(34, "Net à payer imprimé = net à payer calculé", abs(printed_payable - calc.net_a_payer) <= 0.02,
+            f"Imprimé {printed_payable:,.2f}; calculé {calc.net_a_payer:,.2f}.")
+    else:
+        add(34, "Net à payer imprimé absent — contrôle non disponible", True)
+
+    stamp_condition = (data.droits_de_timbre_condition or "").strip()
+    stamp_condition_resolved = _stamp_condition_is_resolved(data)
+    add(35, "Condition du droit de timbre résolue", stamp_condition_resolved,
+        (f"Condition détectée: {stamp_condition}; mode de paiement: {data.payment_mode}. "
+         "Le timbre reste non appliqué jusqu'à revue humaine.") if not stamp_condition_resolved else None)
 
     balance_checks: list[BalanceCheck] = []
     for entry in entries:

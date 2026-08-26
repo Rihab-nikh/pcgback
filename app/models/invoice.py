@@ -90,7 +90,22 @@ class ExtractedInvoiceData(BaseModel):
     escompte_pct: float = Field(default=0.0, description="Escompte percentage (0-100)")
     tva_pct: float = Field(default=20.0, description="TVA percentage (0, 7, 10, 14, or 20)")
     retenue_a_la_source_pct: float = Field(default=0.0, description="Retenue a la source percentage (e.g. 10.0)")
-    droits_de_timbre: float = Field(default=0.0, description="Fixed droits de timbre amount in MAD")
+    droits_de_timbre: float = Field(
+        default=0.0,
+        description="Stamp duty actually applicable to the invoice in MAD, excluding merely conditional mentions",
+    )
+    droits_de_timbre_mentionne: float = Field(
+        default=0.0,
+        description="Stamp duty amount printed on the document, including conditional or informational mentions",
+    )
+    droits_de_timbre_condition: str | None = Field(
+        default=None,
+        description="Condition printed next to a stamp-duty amount when it is not automatically applicable",
+    )
+    net_a_payer_document: float | None = Field(
+        default=None,
+        description="Final Net à payer/Total à payer explicitly printed on the document; never calculated",
+    )
     payment_mode: Literal["banque", "caisse", "none"] = Field(
         default="none",
         description="Payment method printed/expected on the document. It is NOT proof of settlement.",

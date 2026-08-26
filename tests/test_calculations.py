@@ -50,6 +50,34 @@ def test_droits_de_timbre_added_on_top():
     assert calc.net_a_payer == 1_220
 
 
+def test_conditional_cash_stamp_duty_is_not_applied_to_bank_payment():
+    calc = compute_invoice(make(
+        montant_brut=165.83,
+        tva_pct=20,
+        montant_ttc=199.00,
+        droits_de_timbre=0.50,
+        droits_de_timbre_mentionne=0.50,
+        droits_de_timbre_condition="Uniquement en cas de règlement en espèces",
+        net_a_payer_document=199.00,
+        payment_mode="banque",
+    ))
+    assert calc.ttc == 199.00
+    assert calc.droits_de_timbre == 0.00
+    assert calc.net_a_payer == 199.00
+
+
+def test_conditional_cash_stamp_duty_applies_when_cash_is_evidenced():
+    calc = compute_invoice(make(
+        montant_brut=165.83,
+        tva_pct=20,
+        droits_de_timbre_mentionne=0.50,
+        droits_de_timbre_condition="Uniquement en cas de règlement en espèces",
+        payment_mode="caisse",
+    ))
+    assert calc.droits_de_timbre == 0.50
+    assert calc.net_a_payer == 199.50
+
+
 def test_tva_exempt():
     calc = compute_invoice(make(tva_pct=0))
     assert calc.tva_amount == 0
